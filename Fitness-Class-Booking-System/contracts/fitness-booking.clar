@@ -1,30 +1,28 @@
+;; Section 1: Core Infrastructure and Constants
+;; Basic setup, error constants, and data variables
 
-;; title: fitness-booking
-;; version:
-;; summary:
-;; description:
+(define-constant contract-owner tx-sender)
+(define-constant err-owner-only (err u100))
+(define-constant err-class-not-found (err u101))
+(define-constant err-class-full (err u102))
+(define-constant err-insufficient-payment (err u103))
+(define-constant err-already-booked (err u104))
+(define-constant err-booking-not-found (err u105))
+(define-constant err-instructor-not-found (err u106))
+(define-constant err-membership-not-found (err u107))
+(define-constant err-membership-expired (err u108))
+(define-constant err-invalid-rating (err u109))
+(define-constant err-class-already-started (err u110))
+(define-constant err-unauthorized (err u111))
+(define-constant err-invalid-discount (err u112))
+(define-constant err-waitlist-full (err u113))
+(define-constant err-class-cancelled (err u114))
+(define-constant err-package-not-found (err u115))
 
-;; traits
-;;
-
-;; token definitions
-;;
-
-;; constants
-;;
-
-;; data vars
-;;
-
-;; data maps
-;;
-
-;; public functions
-;;
-
-;; read only functions
-;;
-
-;; private functions
-;;
-
+(define-data-var next-class-id uint u1)
+(define-data-var next-booking-id uint u1)
+(define-data-var next-instructor-id uint u1)
+(define-data-var next-membership-id uint u1)
+(define-data-var next-package-id uint u1)
+(define-data-var max-waitlist-size uint u10)
+(define-data-var cancellation-fee uint u5)
