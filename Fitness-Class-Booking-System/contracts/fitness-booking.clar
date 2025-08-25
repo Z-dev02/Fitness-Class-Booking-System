@@ -26,3 +26,121 @@
 (define-data-var next-package-id uint u1)
 (define-data-var max-waitlist-size uint u10)
 (define-data-var cancellation-fee uint u5)
+
+;; Section 2: Data Structure Definitions
+;; All map definitions for storing application data
+
+(define-map fitness-classes
+  { class-id: uint }
+  {
+    class-name: (string-ascii 50),
+    instructor-id: uint,
+    class-time: uint,
+    duration: uint,
+    max-capacity: uint,
+    current-bookings: uint,
+    price: uint,
+    class-type: (string-ascii 30),
+    status: (string-ascii 20),
+    description: (string-ascii 200),
+    difficulty-level: (string-ascii 20),
+    equipment-needed: (string-ascii 100),
+    location: (string-ascii 50),
+    waitlist-count: uint
+  })
+
+(define-map class-bookings
+  { booking-id: uint }
+  {
+    class-id: uint,
+    student: principal,
+    booking-time: uint,
+    payment-amount: uint,
+    status: (string-ascii 20),
+    payment-method: (string-ascii 20),
+    notes: (string-ascii 100)
+  })
+
+(define-map user-class-bookings
+  { user: principal, class-id: uint }
+  { booking-id: uint, status: (string-ascii 20) })
+
+(define-map instructors
+  { instructor-id: uint }
+  {
+    name: (string-ascii 50),
+    bio: (string-ascii 200),
+    specialties: (string-ascii 100),
+    certification: (string-ascii 50),
+    rating: uint,
+    total-ratings: uint,
+    hourly-rate: uint,
+    status: (string-ascii 20)
+  })
+
+(define-map memberships
+  { membership-id: uint }
+  {
+    user: principal,
+    membership-type: (string-ascii 30),
+    start-date: uint,
+    end-date: uint,
+    classes-remaining: uint,
+    status: (string-ascii 20),
+    discount-rate: uint
+  })
+
+(define-map class-packages
+  { package-id: uint }
+  {
+    package-name: (string-ascii 50),
+    class-count: uint,
+    price: uint,
+    validity-days: uint,
+    discount-rate: uint,
+    package-type: (string-ascii 30)
+  })
+
+(define-map user-packages
+  { user: principal, package-id: uint }
+  {
+    purchase-date: uint,
+    classes-used: uint,
+    expiry-date: uint,
+    status: (string-ascii 20)
+  })
+
+(define-map class-ratings
+  { class-id: uint, user: principal }
+  {
+    rating: uint,
+    review: (string-ascii 200),
+    rating-date: uint
+  })
+
+(define-map waitlist
+  { class-id: uint, user: principal }
+  {
+    join-time: uint,
+    position: uint,
+    status: (string-ascii 20)
+  })
+
+(define-map class-attendance
+  { class-id: uint, user: principal }
+  {
+    attended: bool,
+    check-in-time: uint,
+    notes: (string-ascii 100)
+  })
+
+(define-map recurring-classes
+  { class-id: uint }
+  {
+    recurrence-pattern: (string-ascii 20),
+    end-date: uint,
+    next-occurrence: uint,
+    total-occurrences: uint
+  })
+
+  
