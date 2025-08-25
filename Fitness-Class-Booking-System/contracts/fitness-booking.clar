@@ -282,4 +282,146 @@
     (var-set cancellation-fee new-fee)
     (ok true)))
 
-    
+  ;; Section 4: User Booking and Interaction Functions
+;; Public functions for user interactions with the booking system
+
+(define-public (book-class (class-id uint))
+  (let 
+    ((class-info (unwrap! (map-get? fitness-classes { class-id: class-id }) err-class-not-found))
+     (booking-id (var-get next-booking-id))
+     (current-time (unwrap-panic (get-stacks-block-info? time (- stacks-block-height u1)))))
+    (begin
+      (asserts! (is-eq (get status class-info) "active") err-class-cancelled)
+      (asserts! (is-none (map-get? user-class-bookings { user: tx-sender, class-id: class-id })) err-already-booked)
+      (asserts! (> (get class-time class-info) current-time) err-class-already-started)
+      
+      (if (< (get current-bookings class-info) (get max-capacity class-info))
+        (begin
+          ;; Regular booking
+          (map-set class-bookings { booking-id: booking-id }
+            {
+              class-id: class-id,
+              student: tx-sender,
+              booking-time: current-time,
+              payment-amount: (get price class-info),
+              status: "confirmed",
+              payment-method: "stx",
+              notes: ""
+            })
+          
+          (map-set user-class-bookings { user: tx-sender, class-id: class-id }
+            { booking-id: booking-id, status: "confirmed" })
+          
+          (map-set fitness-classes { class-id: class-id }
+            (merge class-info { current-bookings: (+ (get current-bookings class-info) u1) }))
+          
+          (var-set next-booking-id (+ booking-id u1))
+          (ok booking-id))
+        ;; Add to waitlist if class is full
+        (begin
+          (try! (join-waitlist class-id))
+          (ok u0))))))
+
+(define-public (join-waitlist (class-id uint))
+  (let 
+    ((class-info (unwrap! (map-get? fitness-classes { class-id: class-id }) err-class-not-found))
+     (current-time (unwrap-panic (get-stacks-block-info? time (- stacks-block-height u1))))
+     (waitlist-position (+ (get waitlist-count class-info) u1)))
+    (begin
+      (asserts! (< (get waitlist-count class-info) (var-get max-waitlist-size)) err-waitlist-full)
+      (asserts! (is-none (map-get? waitlist { class-id: class-id, user: tx-sender })) err-already-booked)
+      
+      (map-set waitlist { class-id: class-id, user: tx-sender }
+        {
+          join-time: current-time,
+          position: waitlist-position,
+          status: "waiting"
+        })
+      
+      (map-set fitness-classes { class-id: class-id }
+        (merge class-info { waitlist-count: waitlist-position }))
+      
+      (ok waitlist-position))))
+
+(define-public (cancel-booking (class-id uint))
+  (let 
+    ((user-booking (unwrap! (map-get? user-class-bookings { user: tx-sender, class-id: class-id }) err-booking-not-found))
+     (class-info (unwrap! (map-get? fitness-classes { class-id: class-id }) err-class-not-found))
+     (current-time (unwrap-panic (get-stacks-block-info? time (- stacks-block-height u1)))))
+    (begin
+      ;; Check if cancellation is allowed (e.g., at least 2 hours before class)
+      (asserts! (> (get class-time class-info) (+ current-time u7200)) err-class-already-started)
+      
+      ;; Update booking status
+      (map-set user-class-bookings { user: tx-sender, class-id: class-id }
+        (merge user-booking { status: "cancelled" }))
+      
+      ;; Update class booking count
+      (map-set fitness-classes { class-id: class-id }
+        (merge class-info { current-bookings: (- (get current-bookings class-info) u1) }))
+      
+      ;; Process waitlist if available
+      (try! (process-waitlist class-id))
+      
+      (ok true))))
+
+(define-public (rate-class (class-id uint) (rating uint) (review (string-ascii 200)))
+  (let 
+    ((current-time (unwrap-panic (get-stacks-block-info? time (- stacks-block-height u1))))
+     (user-booking (unwrap! (map-get? user-class-bookings { user: tx-sender, class-id: class-id }) err-booking-not-found)))
+    (begin
+      (asserts! (and (>= rating u1) (<= rating u5)) err-invalid-rating)
+      (asserts! (is-eq (get status user-booking) "confirmed") err-unauthorized)
+      
+      (map-set class-ratings { class-id: class-id, user: tx-sender }
+        {
+          rating: rating,
+          review: review,
+          rating-date: current-time
+        })
+      
+      ;; Update instructor rating (simplified)
+      (try! (update-instructor-rating class-id rating))
+      
+      (ok true))))
+
+(define-public (purchase-package (package-id uint))
+  (let 
+    ((package-info (unwrap! (map-get? class-packages { package-id: package-id }) err-package-not-found))
+     (current-time (unwrap-panic (get-stacks-block-info? time (- stacks-block-height u1))))
+     (expiry-date (+ current-time (* (get validity-days package-info) u86400))))
+    (begin
+      (map-set user-packages { user: tx-sender, package-id: package-id }
+        {
+          purchase-date: current-time,
+          classes-used: u0,
+          expiry-date: expiry-date,
+          status: "active"
+        })
+      
+      (ok true))))
+
+;; Private helper functions
+(define-private (process-waitlist (class-id uint))
+  (let ((class-info (unwrap! (map-get? fitness-classes { class-id: class-id }) err-class-not-found)))
+    (if (> (get waitlist-count class-info) u0)
+      ;; Move first person from waitlist to confirmed booking
+      ;; (Simplified implementation - in practice would need to iterate through waitlist)
+      (ok true)
+      (ok false))))
+
+(define-private (update-instructor-rating (class-id uint) (rating uint))
+  (let 
+    ((class-info (unwrap! (map-get? fitness-classes { class-id: class-id }) err-class-not-found))
+     (instructor-info (unwrap! (map-get? instructors { instructor-id: (get instructor-id class-info) }) err-instructor-not-found))
+     (new-total-ratings (+ (get total-ratings instructor-info) u1))
+     (new-avg-rating (/ (+ (* (get rating instructor-info) (get total-ratings instructor-info)) rating) new-total-ratings)))
+    (begin
+      (map-set instructors { instructor-id: (get instructor-id class-info) }
+        (merge instructor-info 
+          { 
+            rating: new-avg-rating,
+            total-ratings: new-total-ratings 
+          }))
+      (ok true))))
+      
