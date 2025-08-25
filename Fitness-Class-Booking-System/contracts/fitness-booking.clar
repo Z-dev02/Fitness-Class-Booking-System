@@ -1,4 +1,4 @@
-;; Section 1: Core Infrastructure and Constants
+;; Core Infrastructure and Constants
 ;; Basic setup, error constants, and data variables
 
 (define-constant contract-owner tx-sender)
@@ -27,7 +27,6 @@
 (define-data-var max-waitlist-size uint u10)
 (define-data-var cancellation-fee uint u5)
 
-;; Section 2: Data Structure Definitions
 ;; All map definitions for storing application data
 
 (define-map fitness-classes
@@ -143,7 +142,6 @@
     total-occurrences: uint
   })
 
-  ;; Section 3: Administrative Functions
 ;; Owner-only functions for system management
 
 (define-public (create-class
@@ -282,7 +280,6 @@
     (var-set cancellation-fee new-fee)
     (ok true)))
 
-  ;; Section 4: User Booking and Interaction Functions
 ;; Public functions for user interactions with the booking system
 
 (define-public (book-class (class-id uint))
@@ -424,4 +421,64 @@
             total-ratings: new-total-ratings 
           }))
       (ok true))))
-      
+
+;; Functions for retrieving data from the contract
+
+(define-read-only (get-class-info (class-id uint))
+  (map-get? fitness-classes { class-id: class-id }))
+
+(define-read-only (get-booking-info (booking-id uint))
+  (map-get? class-bookings { booking-id: booking-id }))
+
+(define-read-only (get-user-booking (user principal) (class-id uint))
+  (map-get? user-class-bookings { user: user, class-id: class-id }))
+
+(define-read-only (get-instructor-info (instructor-id uint))
+  (map-get? instructors { instructor-id: instructor-id }))
+
+(define-read-only (get-membership-info (membership-id uint))
+  (map-get? memberships { membership-id: membership-id }))
+
+(define-read-only (get-package-info (package-id uint))
+  (map-get? class-packages { package-id: package-id }))
+
+(define-read-only (get-user-package (user principal) (package-id uint))
+  (map-get? user-packages { user: user, package-id: package-id }))
+
+(define-read-only (get-class-rating (class-id uint) (user principal))
+  (map-get? class-ratings { class-id: class-id, user: user }))
+
+(define-read-only (get-waitlist-position (class-id uint) (user principal))
+  (map-get? waitlist { class-id: class-id, user: user }))
+
+(define-read-only (get-attendance-record (class-id uint) (user principal))
+  (map-get? class-attendance { class-id: class-id, user: user }))
+
+(define-read-only (get-next-class-id)
+  (var-get next-class-id))
+
+(define-read-only (get-next-booking-id)
+  (var-get next-booking-id))
+
+(define-read-only (get-next-instructor-id)
+  (var-get next-instructor-id))
+
+(define-read-only (get-next-membership-id)
+  (var-get next-membership-id))
+
+(define-read-only (get-cancellation-fee)
+  (var-get cancellation-fee))
+
+(define-read-only (is-class-available (class-id uint))
+  (match (map-get? fitness-classes { class-id: class-id })
+    class-info (< (get current-bookings class-info) (get max-capacity class-info))
+    false))
+
+(define-read-only (get-user-active-bookings (user principal))
+  ;; This would require iteration in a real implementation
+  ;; Returning a placeholder response
+  (ok u0))
+
+(define-read-only (calculate-discounted-price (class-id uint) (user principal))
+  (let ((class-info (unwrap! (map-get? fitness-classes { class-id: class-id }) err-class-not-found)))
+    (ok (get price class-info))))
