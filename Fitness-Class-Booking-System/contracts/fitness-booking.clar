@@ -143,4 +143,143 @@
     total-occurrences: uint
   })
 
-  
+  ;; Section 3: Administrative Functions
+;; Owner-only functions for system management
+
+(define-public (create-class
+  (class-name (string-ascii 50))
+  (instructor-id uint)
+  (class-time uint)
+  (duration uint)
+  (max-capacity uint)
+  (price uint)
+  (class-type (string-ascii 30))
+  (description (string-ascii 200))
+  (difficulty-level (string-ascii 20))
+  (equipment-needed (string-ascii 100))
+  (location (string-ascii 50)))
+  (let ((class-id (var-get next-class-id)))
+    (begin
+      (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+      (asserts! (is-some (map-get? instructors { instructor-id: instructor-id })) err-instructor-not-found)
+      (map-set fitness-classes { class-id: class-id }
+        {
+          class-name: class-name,
+          instructor-id: instructor-id,
+          class-time: class-time,
+          duration: duration,
+          max-capacity: max-capacity,
+          current-bookings: u0,
+          price: price,
+          class-type: class-type,
+          status: "active",
+          description: description,
+          difficulty-level: difficulty-level,
+          equipment-needed: equipment-needed,
+          location: location,
+          waitlist-count: u0
+        })
+      (var-set next-class-id (+ class-id u1))
+      (ok class-id))))
+
+(define-public (register-instructor
+  (name (string-ascii 50))
+  (bio (string-ascii 200))
+  (specialties (string-ascii 100))
+  (certification (string-ascii 50))
+  (hourly-rate uint))
+  (let ((instructor-id (var-get next-instructor-id)))
+    (begin
+      (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+      (map-set instructors { instructor-id: instructor-id }
+        {
+          name: name,
+          bio: bio,
+          specialties: specialties,
+          certification: certification,
+          rating: u0,
+          total-ratings: u0,
+          hourly-rate: hourly-rate,
+          status: "active"
+        })
+      (var-set next-instructor-id (+ instructor-id u1))
+      (ok instructor-id))))
+
+(define-public (create-membership
+  (user principal)
+  (membership-type (string-ascii 30))
+  (duration-days uint)
+  (classes-included uint)
+  (discount-rate uint))
+  (let 
+    ((membership-id (var-get next-membership-id))
+     (current-time (unwrap-panic (get-stacks-block-info? time (- stacks-block-height u1))))
+     (end-date (+ current-time (* duration-days u86400))))
+    (begin
+      (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+      (map-set memberships { membership-id: membership-id }
+        {
+          user: user,
+          membership-type: membership-type,
+          start-date: current-time,
+          end-date: end-date,
+          classes-remaining: classes-included,
+          status: "active",
+          discount-rate: discount-rate
+        })
+      (var-set next-membership-id (+ membership-id u1))
+      (ok membership-id))))
+
+(define-public (create-package
+  (package-name (string-ascii 50))
+  (class-count uint)
+  (price uint)
+  (validity-days uint)
+  (discount-rate uint)
+  (package-type (string-ascii 30)))
+  (let ((package-id (var-get next-package-id)))
+    (begin
+      (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+      (map-set class-packages { package-id: package-id }
+        {
+          package-name: package-name,
+          class-count: class-count,
+          price: price,
+          validity-days: validity-days,
+          discount-rate: discount-rate,
+          package-type: package-type
+        })
+      (var-set next-package-id (+ package-id u1))
+      (ok package-id))))
+
+(define-public (mark-attendance (class-id uint) (user principal))
+  (let ((current-time (unwrap-panic (get-stacks-block-info? time (- stacks-block-height u1)))))
+    (begin
+      (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+      
+      (map-set class-attendance { class-id: class-id, user: user }
+        {
+          attended: true,
+          check-in-time: current-time,
+          notes: ""
+        })
+      
+      (ok true))))
+
+(define-public (update-class-status (class-id uint) (new-status (string-ascii 20)))
+  (let ((class-info (unwrap! (map-get? fitness-classes { class-id: class-id }) err-class-not-found)))
+    (begin
+      (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+      
+      (map-set fitness-classes { class-id: class-id }
+        (merge class-info { status: new-status }))
+      
+      (ok true))))
+
+(define-public (set-cancellation-fee (new-fee uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (var-set cancellation-fee new-fee)
+    (ok true)))
+
+    
